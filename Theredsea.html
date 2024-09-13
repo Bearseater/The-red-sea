@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Stress Test with Optimized Memory Test</title>
+<style>
+    body, html {
+        height: 100%;
+        margin: 0;
+        overflow: hidden;
+        background-color: #f0f0f0;
+        font-family: Arial, sans-serif;
+    }
+    #canvas {
+        width: 100vw;
+        height: 100vh;
+        position: absolute;
+        top: 0;
+        left: 0;
+        z-index: 0;
+    }
+    button {
+        position: fixed;
+        font-size: 20px;
+        padding: 10px 20px;
+        border: none;
+        background-color: #007BFF;
+        color: white;
+        cursor: pointer;
+        border-radius: 5px;
+        z-index: 10;
+    }
+    button:hover {
+        background-color: #0056b3;
+    }
+    #customBufferButton {
+        top: 10px;
+        right: 10px;
+    }
+    #add1MBButton {
+        top: 70px;
+        right: 10px;
+    }
+    #refreshButton {
+        top: 130px;
+        right: 10px;
+    }
+    #allocateButton {
+        top: 190px;
+        right: 10px;
+    }
+    .log-container {
+        position: fixed;
+        bottom: 10px;
+        left: 10px;
+        right: 10px;
+        height: 300px;
+        overflow-y: auto;
+        background-color: white;
+        border: 2px solid #ccc;
+        padding: 10px;
+        font-family: monospace;
+        font-size: 14px;
+        color: black;
+        z-index: 10;
+        display: flex;
+        flex-direction: column;
+    }
+    .log-message {
+        margin-bottom: 5px;
+    }
+</style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+<button id="customBufferButton" onclick="allocateCustomBuffer()">Allocate Custom Buffer</button>
+<button id="add1MBButton" onclick="add1MBAllocation()">Add 1MB to Current Allocation</button>
+<button id="refreshButton" onclick="refreshPage()">Refresh Page</button>
+<button id="allocateButton" onclick="allocateUntilCrash()">Allocate Until Crash</button>
+<div id="logContainer" class="log-container"></div>
+
+<script>
+const logContainer = document.getElementById('logContainer');
+
+function logMessage(message) {
+    const logEntry = document.createElement('div');
+    logEntry.className = 'log-message';
+    logEntry.textContent = '[+] ' + message;
+    logContainer.appendChild(logEntry);
+
+    // Keep only the most recent 20 log messages
+    const logMessages = logContainer.getElementsByClassName('log-message');
+    if (logMessages.length > 20) {
+        logContainer.removeChild(logMessages[0]);
+    }
+
+    // Scroll to the latest log message
+    logContainer.scrollTop = logContainer.scrollHeight;
+}
+
+let totalAllocatedMB = 0;
+let allocatedBuffer = new ArrayBuffer(0);
+
+function allocateUntilCrash() {
+    const bufferSize = 1 * 1024 * 1024; // 1MB
+    let smallArray = [];
+    
+    logMessage('Starting aggressive allocation to find crash buffer size...');
+    
+    function allocate() {
+        try {
+            smallArray.push(new ArrayBuffer(bufferSize));
+            totalAllocatedMB += 1;
+            logMessage('Current Allocation: ' + totalAllocatedMB + ' MB');
+            setTimeout(allocate, 100); // Continue allocation
+        } catch (e) {
+            logMessage('Allocation error: ' + e.message);
+            logMessage('Crash buffer size: ' + totalAllocatedMB + ' MB');
+        }
+    }
+    
+    allocate();
+}
+
+function allocateCustomBuffer() {
+    const bufferSize = parseInt(prompt('Enter the buffer size in MB:', '0'), 10) * 1024 * 1024; // Convert MB to bytes
+    if (isNaN(bufferSize) || bufferSize <= 0) {
+        alert('Invalid buffer size');
+        return;
+    }
+    
+    logMessage('Allocating custom buffer size: ' + (bufferSize / (1024 * 1024)) + ' MB');
+    
+    try {
+        allocatedBuffer = new ArrayBuffer(bufferSize);
+        logMessage('Custom buffer allocation completed.');
+    } catch (e) {
+        logMessage('Custom buffer allocation error: ' + e.message);
+    }
+}
+
+function add1MBAllocation() {
+    const bufferSize = 1 * 1024 * 1024; // 1MB
+    
+    try {
+        // Create a new larger buffer, copy the old data, and add 1MB
+        let newBuffer = new ArrayBuffer(allocatedBuffer.byteLength + bufferSize);
+        new Uint8Array(newBuffer).set(new Uint8Array(allocatedBuffer)); // Copy old data
+        allocatedBuffer = newBuffer; // Update buffer with new size
+        totalAllocatedMB += 1;
+        logMessage('Added 1MB to current allocation. Total allocated size: ' + totalAllocatedMB + ' MB');
+    } catch (e) {
+        logMessage('Add 1MB Allocation error: ' + e.message);
+    }
+}
+
+function refreshPage() {
+    logMessage('Attempting to refresh page...');
+    
+    function attemptRefresh() {
+        // Attempt to refresh
+        window.location.reload(true);
+
+        // Set a timeout to cancel the refresh shortly after
+        setTimeout(() => {
+            window.stop(); // Attempt to cancel the refresh
+            logMessage('Page refresh attempt cancelled.');
+        }, 50); // Adjust timing as needed
+    }
+
+    // Repeat the refresh attempt indefinitely
+    setInterval(attemptRefresh, 100); // Adjust the interval as needed
+}
+</script>
+</body>
+</html>
